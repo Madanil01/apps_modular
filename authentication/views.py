@@ -31,7 +31,7 @@ class LoginView(APIView):
                 role = user.role.access_level
             except:
                 role = 'public'
-
+            print(role)
             # Prepare response
             response = Response({
                 'role': role,
