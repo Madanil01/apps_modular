@@ -1,0 +1,235 @@
+{% extends "product/base.html" %} {% block content %}
+  {% load dict_utils %} 
+<h1
+  class="text-2xl font-semibold text-gray-800 mb-6 flex justify-between items-center"
+>
+  Product List
+</h1>
+  {% if 'R' in user.access  %}
+<button
+  id="openModalBtn"
+  class="bg-green-500 text-xs hover:bg-green-600 text-white px-2 py-2 rounded mb-4"
+>
+  Add Product
+</button>
+ {% endif %} 
+
+<div class="overflow-x-auto bg-white rounded shadow mb-8">
+  <table class="min-w-full text-sm text-left">
+    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+      <tr>
+        <th class="px-6 py-3">Name</th>
+        <th class="px-6 py-3">Barcode</th>
+        <th class="px-6 py-3">Price</th>
+        {% if dyn_fields %} {% for df in dyn_fields %}
+        <th class="px-6 py-3">{{ df.field_name|capfirst }}</th>
+        {% endfor %} {% endif %} 
+        <th class="px-6 py-3">Action</th>
+     
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      {% for product in products %}
+      <tr class="hover:bg-gray-50">
+        <td class="px-6 py-4 font-medium text-gray-800">{{ product.name }}</td>
+        <td class="px-6 py-4 text-gray-700">{{ product.barcode }}</td>
+        <td class="px-6 py-4 text-gray-700">${{ product.price }}</td>
+        {% if dyn_fields %} {% for df in dyn_fields %}
+        <td class="px-6 py-4 text-gray-700">
+        
+          {{ product.custom_fields|get_item:df.field_name|default:"-" }}
+        </td>
+        {% endfor %} {% endif %}
+        <td class="d-flex gap-2 px-6 py-4">
+          {% if 'D' in user.access  %}
+          <button
+            class="bg-red-500 hover:bg-red-600 text-white text-xs px-3 py-1 rounded delete-btn"
+            data-id="{{ product.id }}"
+          >
+            Delete
+          </button>
+          {% endif %}
+          {% if 'U' in user.access  %}
+          <button
+            class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs px-3 py-1 rounded edit-btn"
+            data-id="{{ product.id }}"
+            data-name="{{ product.name }}"
+            data-barcode="{{ product.barcode }}"
+            data-price="{{ product.price }}"
+            data-stock="{{ product.stock }}"
+            {% for df in dyn_fields %}
+              data-{{ df.field_name }}="{{ product.custom_fields|get_item:df.field_name }}"
+            {% endfor %}
+          >
+            Edit
+          </button>
+          {% endif %}
+
+        </td>
+    
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal Overlay -->
+<div
+  id="modalOverlay"
+  class="fixed inset-0 bg-black bg-opacity-50 hidden"
+></div>
+
+<!-- Modal -->
+<div id="modal" class="fixed inset-0 flex items-center justify-center hidden">
+  <div class="bg-white rounded-lg shadow-lg w-full max-w-2xl mx-4">
+    <div class="flex justify-between items-center border-b px-6 py-4">
+      <h2 class="text-xl font-semibold">Add Product</h2>
+      <button id="closeModalBtn" class="text-gray-500 hover:text-gray-700">
+        &times;
+      </button>
+    </div>
+    <form
+      method="post"
+      action="{% url 'product-add' %}"
+      class="px-6 py-4 space-y-4"
+    >
+      {% csrf_token %}
+      <!-- Static Fields -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <input type="hidden" name="product_id" id="product_id" />
+        <div>
+          <label for="id_name" class="block text-gray-700">Name</label>
+          <input
+            type="text"
+            name="name"
+            id="id_name"
+            required
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <div>
+          <label for="id_barcode" class="block text-gray-700">Barcode</label>
+          <input
+            type="text"
+            name="barcode"
+            id="id_barcode"
+            required
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <div>
+          <label for="id_price" class="block text-gray-700">Price</label>
+          <input
+            type="number"
+            step="0.01"
+            name="price"
+            id="id_price"
+            required
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        <div>
+          <label for="id_stock" class="block text-gray-700">Stock</label>
+          <input
+            type="number"
+            name="stock"
+            id="id_stock"
+            required
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+      </div>
+
+      <!-- Dynamic Fields -->
+      {% if dyn_fields %}
+      <h3 class="text-lg font-medium mt-4">Custom Fields</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {% for df in dyn_fields %}
+        <div>
+          <label class="block text-gray-700"
+            >{{ df.field_name|capfirst }}</label
+          >
+          <input
+            name="{{ df.field_name }}"
+            type="text"
+            value="{{ df.default|default:'' }}"
+            class="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="flex justify-end mt-6">
+        <button
+          type="button"
+          id="cancelBtn"
+          class="mr-4 px-4 py-2 border rounded hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
+        >
+          Save
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  // Delete button handler (existing)
+  document.querySelectorAll(".delete-btn").forEach((btn) => {
+    btn.addEventListener("click", function () {
+      if (confirm("Are you sure to delete this data?")) {
+        fetch(`/product/delete/${this.dataset.id}/`, {
+          method: "POST",
+          headers: { "X-CSRFToken": "{{ csrf_token }}" },
+        }).then(() => window.location.reload());
+      }
+    });
+  });
+
+  // Modal open/close
+  const modal = document.getElementById("modal");
+  const overlay = document.getElementById("modalOverlay");
+  document.getElementById("openModalBtn").addEventListener("click", () => {
+    modal.classList.remove("hidden");
+    overlay.classList.remove("hidden");
+  });
+  function closeModal() {
+    modal.classList.add("hidden");
+    overlay.classList.add("hidden");
+  }
+  document
+    .getElementById("closeModalBtn")
+    .addEventListener("click", closeModal);
+  document.getElementById("cancelBtn").addEventListener("click", closeModal);
+  overlay.addEventListener("click", closeModal);
+
+  document.querySelectorAll(".edit-btn").forEach((btn) => {
+  btn.addEventListener("click", function () {
+    // Show modal
+    modal.classList.remove("hidden");
+    overlay.classList.remove("hidden");
+
+    // Set form action to edit URL
+    document.querySelector("form").action = `/product/edit/${this.dataset.id}/`;
+
+    // Set static fields
+    document.getElementById("id_name").value = this.dataset.name;
+    document.getElementById("id_barcode").value = this.dataset.barcode;
+    document.getElementById("id_price").value = this.dataset.price;
+    document.getElementById("id_stock").value = this.dataset.stock;
+    document.getElementById("product_id").value = this.dataset.id;
+
+    // Set dynamic fields
+    {% for df in dyn_fields %}
+    document.querySelector(`[name='{{ df.field_name }}']`).value = this.dataset["{{ df.field_name }}"] || "";
+    {% endfor %}
+  });
+});
+</script>
+{% endblock %}
