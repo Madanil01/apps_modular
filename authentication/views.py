@@ -5,9 +5,9 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.middleware import csrf
 from django.conf import settings
+from role.models import *
 from django.shortcuts import render, redirect
 from django.contrib import messages
-
 class LoginView(APIView):
     def post(self, request):
         try:
@@ -15,6 +15,7 @@ class LoginView(APIView):
             password = request.data.get('password')
             
             user = authenticate(username=username, password=password)
+            
             if user is None:
                 return Response(
                     {'error': 'Invalid credentials'},
@@ -26,17 +27,19 @@ class LoginView(APIView):
             access_token = str(refresh.access_token)
             
             # Get user role
-            role = getattr(user, 'role', None)
-            role = role.access_level if role else 'public'
+            try:
+                role = user.role.access_level
+            except:
+                role = 'public'
 
-            # Build response
+            # Prepare response
             response = Response({
                 'role': role,
                 'access': access_token,
                 'refresh': str(refresh)
-            }, status=status.HTTP_200_OK)
+            })
 
-            # Set JWT cookie
+            # Set cookies
             response.set_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                 value=access_token,
@@ -45,48 +48,41 @@ class LoginView(APIView):
                 httponly=settings.SIMPLE_JWT['AUTH_COOKIE_HTTP_ONLY'],
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
-            # Set a non-HTTP-only cookie for role
+            
             response.set_cookie(
                 key='user_role',
                 value=role,
                 expires=settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'],
                 secure=settings.SIMPLE_JWT['AUTH_COOKIE_SECURE'],
-                httponly=False,
+                httponly=False,  # Diperlukan untuk dibaca oleh frontend
                 samesite=settings.SIMPLE_JWT['AUTH_COOKIE_SAMESITE']
             )
 
-            # Trigger CSRF token generation
-            csrf.get_token(request)
+            # Set CSRF token
             messages.success(request, 'Login successful')
+            csrf.get_token(request)
 
             return response
-
+            
         except Exception as e:
-            messages.error(request, f"Login failed: {str(e)}")
-            return Response(
-                {'error': 'Internal server error'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
-
+            messages.error(request, f"Failed to upgrade: {str(e)}")
     def get(self, request):
         return render(request, 'login.html')
-
 
 class LogoutView(APIView):
     def post(self, request):
         try:
-            response = redirect('login')  # or your login URL name
+            response = redirect('login')  # Gantilah 'login' jika nama url-nya berbeda
             response.delete_cookie(
                 key=settings.SIMPLE_JWT['AUTH_COOKIE'],
                 path='/',
-                domain=getattr(settings, 'SESSION_COOKIE_DOMAIN', None)
+                domain=settings.SESSION_COOKIE_DOMAIN if hasattr(settings, 'SESSION_COOKIE_DOMAIN') else None
             )
-            messages.success(request, 'Logout successful')
+            # messages.success(request, 'Logout successful')
             return response
-
+            
         except Exception as e:
-            messages.error(request, f"Logout failed: {str(e)}")
-            return Response(
-                {'error': 'Internal server error'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            messages.error(request, f"Failed to logout: {str(e)}")
+    
+v_login = LoginView.as_view()
+v_logout = LogoutView.as_view()
